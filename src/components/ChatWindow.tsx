@@ -8,7 +8,6 @@ import { ChevronLeft, Trash2, Send, CheckSquare, CornerDownRight, Smile, X, Time
 import UserProfile from './UserProfile'
 
 // --- SECURE SUPER ENGINE URL ---
-// Using HTTPS to match your Vercel deployment and satisfy browser security
 const SOCKET_URL = 'https://engine.theroyalfoundation.org.in'
 
 export default function ChatWindow({ activeChat, authUser, onClose, showToast }: any) {
@@ -38,7 +37,7 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         if (!authUser) return;
 
         const handleGameMessage = async (event: MessageEvent) => {
-            // Security: Only listen to your Hostinger domain
+            // Security check for the game host
             if (event.origin !== 'https://theroyalfoundation.org.in') return;
 
             const data = event.data;
@@ -142,9 +141,12 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         }
         fetchHistory()
 
-        // Socket.io with HTTPS compatibility
+        // --- UPDATED SECURE SOCKET INITIALIZATION ---
         socketRef.current = io(SOCKET_URL, {
-            transports: ['websocket', 'polling']
+            path: "/chat-socket", // Split path to avoid Colyseus collision
+            transports: ['websocket', 'polling'],
+            secure: true,
+            rejectUnauthorized: false
         })
         
         const socket = socketRef.current
@@ -230,27 +232,6 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         if (newStatus === 'accepted') redirectToRoyalArena(parsedContent.gameId, msgId);
     }
 
-    const toggleSelection = (msgId: string) => {
-        const newSelection = new Set(selectedMessages);
-        if (newSelection.has(msgId)) newSelection.delete(msgId);
-        else newSelection.add(msgId);
-        setSelectedMessages(newSelection);
-    }
-
-    const deleteSelectedMessages = async () => {
-        const idsToDelete = Array.from(selectedMessages)
-        setSelectedMessages(new Set())
-        setMessages(prev => prev.filter(msg => !idsToDelete.includes(msg.id)))
-        socketRef.current?.emit('delete_message', { room: roomName, deletedIds: idsToDelete })
-        await supabase.from('messages').delete().in('id', idsToDelete)
-    }
-
-    const addReaction = async (msgId: string, emoji: string) => {
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, reaction: emoji } : m))
-        socketRef.current?.emit('add_reaction', { room: roomName, msgId, emoji })
-        await supabase.from('messages').update({ reaction: emoji }).eq('id', msgId)
-    }
-
     return (
         <div suppressHydrationWarning className="absolute inset-0 bg-[#020617] flex flex-col z-10 animate-in fade-in duration-300">
             
@@ -272,14 +253,14 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
                         {isTyping && <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-emerald-500 rounded-full border-2 border-[#0f172a] animate-ping" />}
                     </div>
                     <div>
-                        <h2 className="font-black text-lg text-white mb-1">{activeChat.display_name}</h2>
-                        {isTyping ? <p className="text-emerald-400 text-xs font-bold uppercase animate-pulse">Typing...</p> : <p className="text-indigo-400 text-xs">{activeChat.special_id}</p>}
+                        <h2 className="font-black text-lg text-white mb-1 leading-none">{activeChat.display_name}</h2>
+                        {isTyping ? <p className="text-emerald-400 text-xs font-bold uppercase animate-pulse">Typing...</p> : <p className="text-indigo-400 text-xs font-mono">{activeChat.special_id}</p>}
                     </div>
                 </div>
             </div>
 
             {/* CHAT AREA */}
-            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 bg-[#020617] relative">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 bg-[#020617] relative scroll-smooth">
                 {messages.map((msg) => {
                     const isMe = msg.sender_id === authUser.id
                     let isChallenge = false
@@ -296,7 +277,6 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
                                         <ChallengeCard 
                                             data={challengeData} 
                                             isMe={isMe} 
-                                            msgId={msg.id} 
                                             myUserId={authUser.id} 
                                             onAccept={() => updateChallengeStatus(msg.id, challengeData, 'accepted')} 
                                             onExpire={() => updateChallengeStatus(msg.id, challengeData, 'expired')} 
