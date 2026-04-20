@@ -2,11 +2,13 @@
 
 import dynamic from 'next/dynamic'
 
-// This forces the ChatWindow to ONLY load in the browser.
-// The server will see absolutely nothing, which prevents the 418 error.
 const DynamicChat = dynamic(() => import('./ChatWindow'), { 
-  ssr: false,
-  loading: () => <div className="flex-1 bg-[#020617] animate-pulse" /> 
+  ssr: false, // This kills the Hydration Error #418 forever
+  loading: () => (
+    <div className="flex-1 bg-[#020617] flex items-center justify-center">
+      <div className="w-12 h-12 border-4 border-indigo-500/20 border-t-indigo-500 rounded-full animate-spin" />
+    </div>
+  )
 })
 
 export default function ChatWrapper(props: any) {
