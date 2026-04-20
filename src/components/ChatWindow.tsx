@@ -130,9 +130,10 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         setTimeout(() => { setActiveArenaUrl(arenaUrl); }, 800);
     };
 
-    // --- SOCKET & DB INIT ---
+    // --- FINAL STABILITY GUARD SOCKET & DB INIT ---
     useEffect(() => {
-        if (!activeChat?.id || !authUser?.id) return
+        // Only run if we are in the browser AND have the necessary IDs
+        if (typeof window === 'undefined' || !activeChat?.id || !authUser?.id) return
 
         const fetchHistory = async () => {
             const { data } = await supabase
@@ -148,7 +149,7 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         }
         fetchHistory()
 
-        // --- PRODUCTION SOCKET CONFIG ---
+        // --- PRODUCTION SECURE SOCKET CONFIG ---
         socketRef.current = io(SOCKET_URL, {
             path: "/chat-socket/", 
             transports: ['websocket'], 
@@ -160,7 +161,11 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         })
         
         const socket = socketRef.current
-        socket.emit('join_room', roomName)
+        
+        // Add a 100ms delay to joining the room to allow React to settle
+        const joinTimeout = setTimeout(() => {
+            socket.emit('join_room', roomName)
+        }, 100);
 
         socket.on('receive_message', (incomingMsg) => {
             setMessages(prev => [...prev, incomingMsg])
@@ -183,7 +188,10 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
             setMessages(prev => prev.map(msg => msg.id === updatedData.id ? { ...msg, content: updatedData.content } : msg))
         })
 
-        return () => { socket.disconnect() }
+        return () => { 
+            clearTimeout(joinTimeout);
+            socket.disconnect(); 
+        }
     }, [activeChat?.id, authUser?.id, roomName])
 
     const handleTyping = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -240,27 +248,6 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         socketRef.current?.emit('update_message', { room: roomName, id: msgId, content: updatedContentStr })
         await supabase.from('messages').update({ content: updatedContentStr }).eq('id', msgId)
         if (newStatus === 'accepted') redirectToRoyalArena(parsedContent.gameId, msgId);
-    }
-
-    const toggleSelection = (msgId: string) => {
-        const newSelection = new Set(selectedMessages);
-        if (newSelection.has(msgId)) newSelection.delete(msgId);
-        else newSelection.add(msgId);
-        setSelectedMessages(newSelection);
-    }
-
-    const deleteSelectedMessages = async () => {
-        const idsToDelete = Array.from(selectedMessages)
-        setSelectedMessages(new Set())
-        setMessages(prev => prev.filter(msg => !idsToDelete.includes(msg.id)))
-        socketRef.current?.emit('delete_message', { room: roomName, deletedIds: idsToDelete })
-        await supabase.from('messages').delete().in('id', idsToDelete)
-    }
-
-    const addReaction = async (msgId: string, emoji: string) => {
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, reaction: emoji } : m))
-        socketRef.current?.emit('add_reaction', { room: roomName, msgId, emoji })
-        await supabase.from('messages').update({ reaction: emoji }).eq('id', msgId)
     }
 
     return (
@@ -370,7 +357,6 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
 }
 
 const ChallengeCard = ({ data, isMe, myUserId, onAccept }: any) => {
-    // Hydration guard for the Card too
     const [hasMounted, setHasMounted] = useState(false);
     useEffect(() => { setHasMounted(true); }, []);
     
