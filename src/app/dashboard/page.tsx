@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../lib/supabaseClient'
-import ChatWindow from '../../components/ChatWindow' // <-- IMPORTING YOUR NEW COMPONENT
+import ChatWindow from '../../components/ChatWindow'
+import ClientOnly from '../../components/ClientOnly' // <-- IMPORT THE SHIELD
 import { Search, LogOut, Swords, Camera, X, Upload, UserPlus, Gamepad2, Users, Check, Clock, UserMinus, MessageSquare } from 'lucide-react'
 
 export default function Dashboard() {
@@ -153,15 +154,19 @@ export default function Dashboard() {
       {/* MAIN CONTENT AREA */}
       <div className="flex-1 flex flex-col relative">
         
-        {/* WE MOVED THE CHAT HERE! */}
-        {activeChat ? (
-          <ChatWindow 
-            activeChat={activeChat} 
-            authUser={authUser} 
-            onClose={() => setActiveChat(null)} 
-            showToast={showToast} 
-          />
-        ) : (
+        {/* THE PERFECT CLIENT-ONLY WRAPPER */}
+        {activeChat && (
+          <ClientOnly>
+            <ChatWindow 
+              activeChat={activeChat} 
+              authUser={authUser} 
+              onClose={() => setActiveChat(null)} 
+              showToast={showToast} 
+            />
+          </ClientOnly>
+        )}
+
+        {!activeChat && (
           <div className="flex-1 flex flex-col h-full overflow-y-auto">
             {activeTab === 'arena' ? (
               <>
