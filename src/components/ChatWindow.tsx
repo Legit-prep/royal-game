@@ -7,7 +7,7 @@ import { ARCADE_GAMES } from '../lib/arcadeGames'
 import { ChevronLeft, Trash2, Send, CheckSquare, CornerDownRight, Smile, X, Swords, Timer, Gamepad2 } from 'lucide-react'
 import UserProfile from './UserProfile'
 
-const SOCKET_URL = 'http://engine.theroyalfoundation.org.in:3001'
+const SOCKET_URL = 'https://engine.theroyalfoundation.org.in'
 
 export default function ChatWindow({ activeChat, authUser, onClose, showToast }: any) {
     const [messages, setMessages] = useState<any[]>([])
