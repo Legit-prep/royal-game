@@ -19,6 +19,9 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
     const [showGameMenu, setShowGameMenu] = useState(false)
     const [showProfile, setShowProfile] = useState(false)
     
+    // Guard against Hydration Mismatch
+    const [hasMounted, setHasMounted] = useState(false);
+    
     // Iframe Overlay State
     const [activeArenaUrl, setActiveArenaUrl] = useState<string | null>(null)
     const [activeChallengeMsgId, setActiveChallengeMsgId] = useState<string | null>(null)
@@ -32,7 +35,12 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
     }
 
-    // --- GAME ENGINE LISTENER (SUPABASE POINTS) ---
+    // Set mounted state on load
+    useEffect(() => {
+        setHasMounted(true);
+    }, []);
+
+    // --- GAME ENGINE LISTENER ---
     useEffect(() => {
         if (!authUser) return;
 
@@ -140,10 +148,10 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         }
         fetchHistory()
 
-        // --- UPDATED PRODUCTION SOCKET CONFIGURATION ---
+        // --- PRODUCTION SOCKET CONFIG ---
         socketRef.current = io(SOCKET_URL, {
-            path: "/chat-socket/", // Leading and trailing slash for Nginx Proxying
-            transports: ['websocket'], // Force WebSocket to fix "Invalid Frame Header"
+            path: "/chat-socket/", // Nginx trailing slash compatibility
+            transports: ['websocket'], // Force WebSocket for production stability
             secure: true,
             reconnection: true,
             reconnectionAttempts: 10,
@@ -234,6 +242,27 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         if (newStatus === 'accepted') redirectToRoyalArena(parsedContent.gameId, msgId);
     }
 
+    const toggleSelection = (msgId: string) => {
+        const newSelection = new Set(selectedMessages);
+        if (newSelection.has(msgId)) newSelection.delete(msgId);
+        else newSelection.add(msgId);
+        setSelectedMessages(newSelection);
+    }
+
+    const deleteSelectedMessages = async () => {
+        const idsToDelete = Array.from(selectedMessages)
+        setSelectedMessages(new Set())
+        setMessages(prev => prev.filter(msg => !idsToDelete.includes(msg.id)))
+        socketRef.current?.emit('delete_message', { room: roomName, deletedIds: idsToDelete })
+        await supabase.from('messages').delete().in('id', idsToDelete)
+    }
+
+    const addReaction = async (msgId: string, emoji: string) => {
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, reaction: emoji } : m))
+        socketRef.current?.emit('add_reaction', { room: roomName, msgId, emoji })
+        await supabase.from('messages').update({ reaction: emoji }).eq('id', msgId)
+    }
+
     return (
         <div suppressHydrationWarning className="absolute inset-0 bg-[#020617] flex flex-col z-10 animate-in fade-in duration-300">
             
@@ -261,9 +290,9 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
                 </div>
             </div>
 
-            {/* CHAT AREA */}
+            {/* CHAT AREA WITH HYDRATION GUARD */}
             <div className="flex-1 overflow-y-auto p-4 sm:p-8 space-y-6 bg-[#020617] relative scroll-smooth">
-                {messages.map((msg) => {
+                {hasMounted && messages.map((msg) => {
                     const isMe = msg.sender_id === authUser.id
                     let isChallenge = false
                     let challengeData = null
@@ -284,7 +313,7 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
                                             onExpire={() => updateChallengeStatus(msg.id, challengeData, 'expired')} 
                                         />
                                     ) : (
-                                        <div className={`px-5 py-3 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm' : 'bg-[#0f172a] border border-slate-800 text-slate-200 rounded-bl-sm'}`}>
+                                        <div className={`px-5 py-3 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm shadow-xl' : 'bg-[#0f172a] border border-slate-800 text-slate-200 rounded-bl-sm'}`}>
                                             <p className="leading-relaxed text-[15px]">{msg.content}</p>
                                         </div>
                                     )}
@@ -334,8 +363,14 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
 }
 
 const ChallengeCard = ({ data, isMe, myUserId, onAccept }: any) => {
+    // Hydration guard for the Card too
+    const [hasMounted, setHasMounted] = useState(false);
+    useEffect(() => { setHasMounted(true); }, []);
+    
     const GameIcon = ARCADE_GAMES.find(g => g.id === data.gameId)?.icon || Gamepad2
     const colorClass = ARCADE_GAMES.find(g => g.id === data.gameId)?.color || 'bg-indigo-500'
+
+    if (!hasMounted) return null;
 
     return (
         <div className={`w-[280px] p-1 rounded-3xl ${isMe ? 'bg-indigo-500' : 'bg-slate-800'}`}>
