@@ -37,7 +37,6 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         if (!authUser) return;
 
         const handleGameMessage = async (event: MessageEvent) => {
-            // Security check for the game host
             if (event.origin !== 'https://theroyalfoundation.org.in') return;
 
             const data = event.data;
@@ -98,7 +97,7 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
             if (result === 'win') {
                 newPoints += 25;
                 newWins += 1;
-                showToast(`Victory! +25 Points added.`, 'success');
+                showToast(`Victory! +25 Points.`, 'success');
             } else if (result === 'lose') {
                 newPoints = Math.max(0, newPoints - 25);
                 newLosses += 1;
@@ -141,11 +140,14 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
         }
         fetchHistory()
 
-        // --- UPDATED SECURE SOCKET INITIALIZATION ---
+        // --- UPDATED PRODUCTION SOCKET CONFIGURATION ---
         socketRef.current = io(SOCKET_URL, {
-            path: "/chat-socket", // Split path to avoid Colyseus collision
-            transports: ['websocket', 'polling'],
+            path: "/chat-socket/", // Leading and trailing slash for Nginx Proxying
+            transports: ['websocket'], // Force WebSocket to fix "Invalid Frame Header"
             secure: true,
+            reconnection: true,
+            reconnectionAttempts: 10,
+            timeout: 10000,
             rejectUnauthorized: false
         })
         
