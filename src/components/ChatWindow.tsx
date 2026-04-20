@@ -150,8 +150,8 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
 
         // --- PRODUCTION SOCKET CONFIG ---
         socketRef.current = io(SOCKET_URL, {
-            path: "/chat-socket/", // Nginx trailing slash compatibility
-            transports: ['websocket'], // Force WebSocket for production stability
+            path: "/chat-socket/", 
+            transports: ['websocket'], 
             secure: true,
             reconnection: true,
             reconnectionAttempts: 10,
@@ -314,7 +314,14 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
                                         />
                                     ) : (
                                         <div className={`px-5 py-3 rounded-3xl ${isMe ? 'bg-indigo-600 text-white rounded-br-sm shadow-xl' : 'bg-[#0f172a] border border-slate-800 text-slate-200 rounded-bl-sm'}`}>
-                                            <p className="leading-relaxed text-[15px]">{msg.content}</p>
+                                            <p className="leading-relaxed text-[15px] font-medium">{msg.content}</p>
+                                            
+                                            {/* STABLE TIME FIX */}
+                                            <div className={`flex items-center mt-1 gap-2 ${isMe ? 'justify-end' : 'justify-start'}`}>
+                                                <span suppressHydrationWarning className="text-[9px] opacity-40 font-bold uppercase">
+                                                    {hasMounted ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                                                </span>
+                                            </div>
                                         </div>
                                     )}
                                 </div>
@@ -328,11 +335,11 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
             {/* FOOTER */}
             <div className="p-4 sm:p-6 bg-[#0f172a] border-t border-slate-800">
                 <form onSubmit={sendMessage} className="flex items-center gap-3">
-                    <button type="button" onClick={() => setShowGameMenu(!showGameMenu)} className="p-4 bg-slate-900 border-2 border-slate-700 text-indigo-500 rounded-2xl">
+                    <button type="button" onClick={() => setShowGameMenu(!showGameMenu)} className="p-4 bg-slate-900 border-2 border-slate-700 text-indigo-500 rounded-2xl transition">
                         <Gamepad2 className="w-6 h-6" />
                     </button>
-                    <input type="text" value={chatInput} onChange={handleTyping} placeholder="Type your message..." className="w-full bg-slate-900 border border-slate-700 rounded-2xl py-4 px-6 text-white" />
-                    <button type="submit" className="bg-indigo-600 text-white p-4 rounded-2xl hover:scale-105 transition">
+                    <input type="text" value={chatInput} onChange={handleTyping} placeholder="Type your message..." className="w-full bg-slate-900 border border-slate-700 rounded-2xl py-4 px-6 text-white outline-none focus:ring-2 focus:ring-indigo-500 transition" />
+                    <button type="submit" className="bg-indigo-600 text-white p-4 rounded-2xl hover:scale-105 transition active:scale-95">
                         <Send className="w-6 h-6" />
                     </button>
                 </form>
@@ -340,16 +347,16 @@ export default function ChatWindow({ activeChat, authUser, onClose, showToast }:
 
             {/* GAME MENU */}
             {showGameMenu && (
-                <div className="absolute bottom-[100px] left-4 right-4 bg-[#1e293b] border border-slate-700 rounded-[2rem] p-6 z-50 shadow-2xl">
+                <div className="absolute bottom-[100px] left-4 right-4 bg-[#1e293b] border border-slate-700 rounded-[2rem] p-6 z-50 shadow-2xl animate-in slide-in-from-bottom-5 duration-300">
                     <div className="grid grid-cols-3 gap-4">
                         {ARCADE_GAMES.map(game => {
                             const Icon = game.icon
                             return (
-                                <button key={game.id} onClick={() => sendChallenge(game)} className="flex flex-col items-center p-4 bg-slate-900 rounded-2xl hover:bg-slate-800 transition">
+                                <button key={game.id} onClick={() => sendChallenge(game)} className="flex flex-col items-center p-4 bg-slate-900 rounded-2xl hover:bg-slate-800 transition transform hover:-translate-y-1">
                                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center mb-2 ${game.color}`}>
                                         <Icon className="w-6 h-6 text-white" />
                                     </div>
-                                    <span className="text-xs font-bold text-slate-300">{game.name}</span>
+                                    <span className="text-xs font-bold text-slate-300 uppercase tracking-tighter">{game.name}</span>
                                 </button>
                             )
                         })}
@@ -373,35 +380,44 @@ const ChallengeCard = ({ data, isMe, myUserId, onAccept }: any) => {
     if (!hasMounted) return null;
 
     return (
-        <div className={`w-[280px] p-1 rounded-3xl ${isMe ? 'bg-indigo-500' : 'bg-slate-800'}`}>
-            <div className="bg-[#0f172a] rounded-[1.3rem] p-5 h-full">
+        <div className={`w-[280px] p-1 rounded-3xl ${isMe ? 'bg-indigo-500 shadow-xl shadow-indigo-500/20' : 'bg-slate-800 border border-slate-700'}`}>
+            <div className="bg-[#0f172a] rounded-[1.3rem] p-5 h-full relative overflow-hidden">
                 <div className="flex items-center mb-4">
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center mr-3 ${colorClass}`}>
                         <GameIcon className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                        <p className="text-[10px] font-black uppercase text-slate-500">Challenge</p>
-                        <p className="font-black text-white text-base">{data.gameName}</p>
+                        <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Challenge</p>
+                        <p className="font-black text-white text-base leading-tight">{data.gameName}</p>
                     </div>
                 </div>
                 {data.status === 'pending' && !isMe && (
-                    <button onClick={onAccept} className="w-full bg-indigo-600 text-white font-black py-3 rounded-xl uppercase text-sm">Accept Battle</button>
+                    <button onClick={onAccept} className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-black py-3 rounded-xl uppercase text-sm transition shadow-lg shadow-indigo-500/20">Accept Battle</button>
                 )}
                 {data.status === 'pending' && isMe && (
-                    <div className="text-center text-xs font-bold text-slate-500">Waiting for opponent...</div>
+                    <div className="text-center text-xs font-bold text-slate-500 flex items-center justify-center gap-2">
+                        <div className="w-1.5 h-1.5 bg-indigo-500 rounded-full animate-pulse" />
+                        Waiting for opponent...
+                    </div>
                 )}
                 {data.status === 'accepted' && (
-                    <div className="text-amber-400 font-black text-center text-sm uppercase animate-pulse">Battle in Progress!</div>
+                    <div className="text-amber-400 font-black text-center text-sm uppercase animate-pulse flex items-center justify-center gap-2">
+                         <Swords className="w-4 h-4" /> Battle in Progress!
+                    </div>
                 )}
                 {data.status === 'completed' && (
-                    <div className="text-center">
+                    <div className="text-center bg-slate-900/50 rounded-xl py-2 border border-slate-800">
                         <p className={`font-black text-lg uppercase ${data.winnerId === myUserId ? 'text-emerald-400' : 'text-red-400'}`}>
                             {data.winnerId === myUserId ? '🏆 Victory' : '💀 Defeat'}
                         </p>
                     </div>
                 )}
-                {data.status === 'draw' && <div className="text-slate-400 font-black text-center text-sm uppercase">🤝 Draw</div>}
+                {data.status === 'draw' && <div className="text-slate-400 font-black text-center text-sm uppercase bg-slate-900/50 py-2 rounded-xl border border-slate-800">🤝 Draw</div>}
             </div>
         </div>
     )
 }
+
+const Swords = ({ className }: { className?: string }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="14.5 17.5 3 6 3 3 6 3 17.5 14.5"/><line x1="13" y1="19" x2="19" y2="13"/><line x1="16" y1="16" x2="20" y2="20"/><line x1="19" y1="21" x2="20" y2="20"/><polyline points="14.5 6.5 18 3 21 3 21 6 17.5 9.5"/><line x1="5" y1="14" x2="9" y2="18"/><line x1="7" y1="17" x2="4" y2="20"/><line x1="3" y1="19" x2="4" y2="20"/></svg>
+)
